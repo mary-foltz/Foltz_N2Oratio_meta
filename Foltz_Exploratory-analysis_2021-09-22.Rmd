@@ -1,0 +1,196 @@
+---
+title: "Foltz_Exploratory-analysis_2021-09-22"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+# load in relevant packages
+
+```{r}
+library('dplyr')
+library('readxl')
+library('ggplot2')
+library('gridExtra')
+library('tidyr')
+library('rpart')
+library('randomForest')
+```
+
+## Data
+
+```{r}
+nr <- read_excel('N2O ratio database_2021-09-22.xlsx', sheet = "database", na =  c("NA", "NR"))
+head(nr)
+names(nr)
+
+# some fixing on the names
+nr <- nr %>% 
+  select(
+    author_year, Location, 
+    subs_source = 4, soil_texture = 6, location = 3,
+    soil_bd = 7, soil_ph = 8, subs_amount = 9, added_C_type = 10,
+    added_N_type = 11, gas = 12, inhibitors = 13, incubation_time = 14,
+    temp = 15, nr_trt_mean = 16, nr_trt_sd = 17, nr_ctrl_mean = 18,
+    nr_ctrol_sd = 19, nr_n = 20, C_ini = 21, C_added = 22, 
+    C_total = 23, N_ini = 24, N_added = 25, N_total = 26, CN_total = 27,
+    CN_added = 28) %>% 
+  mutate(diff_nr = nr_trt_mean - nr_ctrl_mean, soil_ph = as.numeric(soil_ph), 
+         temp = ifelse(temp == '23-25', 24, temp), temp = as.numeric(temp))
+```
+
+## Exploratory analysis
+
+### Checking factor levels {.tabset}
+
+#### Soil texture
+
+```{r}
+nr %>% group_by(soil_texture) %>% tally %>% 
+  ggplot(.) + aes(x = soil_texture, y = n) + geom_col() + coord_flip()
+
+ggplot(nr) +
+  aes(x = soil_texture, y = nr_trt_mean) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+
+#### Added C type 
+
+
+```{r}
+nr %>% group_by(added_C_type) %>% tally %>% 
+  ggplot(.) + aes(x = added_C_type, y = n) + geom_col() + coord_flip()
+
+ggplot(nr) +
+  aes(x = added_C_type, y = nr_trt_mean) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+#### Added N type
+
+```{r}
+nr %>% group_by(added_N_type) %>% tally %>% 
+  ggplot(.) + aes(x = added_N_type, y = n) + geom_col() + coord_flip()
+
+
+ggplot(nr) +
+  aes(x = added_N_type, y = nr_trt_mean) +
+  geom_boxplot() +
+  coord_flip()
+
+```
+
+#### Inhibitors
+
+```{r}
+nr %>% group_by(inhibitors) %>% tally %>% 
+  ggplot(.) + aes(x = inhibitors, y = n) + geom_col() + coord_flip()
+
+ggplot(nr) +
+  aes(x = inhibitors, y = nr_trt_mean) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+#### Headspace gas
+
+```{r}
+nr %>% group_by(gas) %>% tally %>% 
+  ggplot(.) + aes(x = gas, y = n) + geom_col() + coord_flip()
+
+ggplot(nr) +
+  aes(x = gas, y = nr_trt_mean) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+### Distribution of treatments
+
+```{r}
+select(nr, C_added, N_added, CN_added) %>% 
+  gather(., trt, value) %>% 
+  ggplot(., aes(x = trt, y = value)) +
+  geom_boxplot(coef = 3) + 
+  facet_wrap(~ trt, scales = 'free')
+```
+
+
+### General trends {.tabset}
+
+#### NR vs C
+
+```{r}
+ggplot(nr) +
+  aes(x = C_added, y = nr_trt_mean) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  ggtitle("all data")
+```
+
+
+
+#### NR vs N
+
+```{r}
+ggplot(nr) +
+  aes(x = N_added, y = nr_trt_mean) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  ggtitle("all data")
+```
+
+#### NR vs CN
+
+```{r}
+ggplot(nr) +
+  aes(x = CN_added, y = nr_trt_mean) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  ggtitle("all data")
+```
+
+## Tree based models
+
+### CART
+
+```{r}
+nr2 <- nr %>% 
+  select(subs_source, soil_texture, soil_ph, subs_amount, 
+         added_C_type, added_N_type, gas, inhibitors, incubation_time, temp, 
+         nr_trt_mean, C_added, CN_added, N_added, nr_n) %>% 
+  na.omit()
+
+tree <- rpart(nr_trt_mean ~ ., data = nr2, weights = nr_n)
+printcp(tree)
+rsq.rpart(tree)
+```
+
+# prune tree at cp where the relative error starts to level out (n=4, split=3)
+```{r}
+tree2 <- prune(tree, cp = 0.029)
+plotcp(tree2)
+summary(tree2)
+```
+# tree plot
+
+```{r}
+par(mar = c(1,1,1,1))
+plot(tree2)
+text(tree2, cex = 0.8)
+```
+
+### Random forest
+
+```{r}
+rf <- randomForest(nr_trt_mean ~ ., data = nr2, weights = nr_n)
+rf
+varImpPlot(rf)
+```
+
+
