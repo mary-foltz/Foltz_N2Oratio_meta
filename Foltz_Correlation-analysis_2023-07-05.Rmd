@@ -1,0 +1,136 @@
+---
+title: "Foltz_Correlation-analysis_2023-07-05"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+Correlation analysis
+
+# load in necessary packages (make sure you installed them first)
+```{r}
+library('metafor')
+library('readxl')
+library('tidyverse')
+library('dplyr')
+library('ggplot2')
+```
+
+# Read in data and prepare meta variables
+```{r}
+meta.data <- read_excel('N2O ratio database_2023-07-05.xlsx', sheet = "database", na =  c("NA", "NR"))
+head(meta.data)
+names(meta.data)
+
+# make dataframe of samples that have treatment and control
+meta.data.wcont.wsd <- meta.data %>%
+  filter(!is.na(N2O.ratio_cont), SD_cont > 0, SD_trt > 0)
+
+# Use escalc function to setup meta using mean difference "MD" --> calculates yi and vi
+dat <- escalc(measure = "MD", m1i = N2O.ratio_trt, m2i = N2O.ratio_cont,
+              sd1i = SD_trt, sd2i = SD_cont, n1i = n, n2i = n,
+              data = meta.data.wcont.wsd, append = TRUE)
+```
+
+### Begin by looking at data that have treatment and control
+# Test data for normality 
+```{r}
+shapiro.test(dat$N2O.ratio_trt)
+shapiro.test(dat$N2O.ratio_cont)
+shapiro.test(dat$Soil.pH)
+shapiro.test(dat$C.added)
+shapiro.test(dat$N.added)
+shapiro.test(dat$C.N.added)
+shapiro.test(dat$Total.C)
+shapiro.test(dat$Total.N)
+shapiro.test(dat$C.N.total)
+shapiro.test(dat$yi)
+shapiro.test(dat$vi)
+#hist(dat$N2O.ratio_trt,main="Histogram of cumulative N2O fluxes",xlab="N2O flux (kgN/ha)")
+```
+Non-normal data, so use Spearman's rank correlation test
+
+# Correlations
+# testing treatment effect (yi) vs. several variables also tested in the meta
+```{r}
+cor.test(dat$yi, dat$Soil.pH, method="spearman") 
+cor.test(dat$yi, dat$C.added, method="spearman") 
+cor.test(dat$yi, dat$N.added, method="spearman") 
+cor.test(dat$yi, dat$C.N.added, method="spearman") 
+cor.test(dat$yi, dat$Total.C, method="spearman") 
+cor.test(dat$yi, dat$Total.N, method="spearman") 
+cor.test(dat$yi, dat$C.N.total, method="spearman") 
+```
+
+# testing N2O ratio trt vs. several variables also tested in the meta
+```{r}
+cor.test(dat$N2O.ratio_trt, dat$Soil.pH, method="spearman") 
+cor.test(dat$N2O.ratio_trt, dat$C.added, method="spearman") 
+cor.test(dat$N2O.ratio_trt, dat$N.added, method="spearman") 
+cor.test(dat$N2O.ratio_trt, dat$C.N.added, method="spearman") 
+cor.test(dat$N2O.ratio_trt, dat$Total.C, method="spearman") 
+cor.test(dat$N2O.ratio_trt, dat$Total.N, method="spearman") 
+cor.test(dat$N2O.ratio_trt, dat$C.N.total, method="spearman") 
+```
+
+### Next consider data that have treatments (without excluding those without controls)
+# Test data for normality 
+```{r}
+shapiro.test(meta.data$N2O.ratio_trt)
+shapiro.test(meta.data$N2O.ratio_cont)
+shapiro.test(meta.data$Soil.pH)
+shapiro.test(meta.data$C.added)
+shapiro.test(meta.data$N.added)
+shapiro.test(meta.data$C.N.added)
+shapiro.test(meta.data$Total.C)
+shapiro.test(meta.data$Total.N)
+shapiro.test(meta.data$C.N.total)
+```
+
+# Nonnormal data so continue using Spearmans (nonparametric)
+# testing N2O ratio trt (full database) vs. several variables also tested in the meta then organizing into table
+```{r}
+cor1 <- cor.test(meta.data$N2O.ratio_trt, meta.data$Soil.pH, method="spearman") 
+cor2 <- cor.test(meta.data$N2O.ratio_trt, meta.data$C.added, method="spearman") 
+cor3 <- cor.test(meta.data$N2O.ratio_trt, meta.data$N.added, method="spearman") 
+cor4 <- cor.test(meta.data$N2O.ratio_trt, meta.data$C.N.added, method="spearman") 
+cor5 <- cor.test(meta.data$N2O.ratio_trt, meta.data$Total.C, method="spearman") 
+cor6 <- cor.test(meta.data$N2O.ratio_trt, meta.data$Total.N, method="spearman") 
+cor7 <- cor.test(meta.data$N2O.ratio_trt, meta.data$C.N.total, method="spearman") 
+
+corr.df <- data.frame(variable=c("pH", "C added","N added", "C/N added", "Total C", "Total N", "Total C/N"), rho=1:7)
+
+corr.df$rho[1] <- print(cor1$estimate)
+corr.df$rho[2] <- print(cor2$estimate)
+corr.df$rho[3] <- print(cor3$estimate)
+corr.df$rho[4] <- print(cor4$estimate)
+corr.df$rho[5] <- print(cor5$estimate)
+corr.df$rho[6] <- print(cor6$estimate)
+corr.df$rho[7] <- print(cor7$estimate)
+
+corr.df$abs <- abs(corr.df$rho)
+
+corr.df.sort <- corr.df[order(corr.df$abs),]
+```
+
+# plotting correlations in tornado plot
+
+```{r}
+
+corr.df %>%
+  mutate(variable = fct_reorder(variable,abs)) %>%
+  ggplot(aes(x=variable, y=rho)) +
+  geom_bar(stat="identity", alpha=.6, width=.4) +
+  coord_flip() +
+  theme_bw() +
+  geom_hline(yintercept = 0, size=1) +
+  labs(y = "Spearman's rank correlation coefficient", x = expression("N"[2]*"O ratio vs.")) +
+  theme(axis.title=element_text(size=9), axis.text=element_text(size=9)) +
+  scale_y_continuous(breaks=c(-.5,-.4,-.3,-.2,-.1,0,.1,.2))
+
+#ggsave("Figure3.tiff", units="in", width=3.346, height=2.8, dpi=300, compression = 'lzw')
+```
+
