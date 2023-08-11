@@ -1,7 +1,7 @@
 # Foltz_N2Oratio_meta
 Database and code used in N2O ratio systematic review and meta-analysis
 
-This contains the final database and code used in preparation of the manuscript "Factors driving the nitrous oxide ratio: a systematic review  of laboratory soil denitrification experiments" by Foltz, Alesso, and Zilles. 
+This contains the final database and code used in preparation of the manuscript "Field soil properties and experimental nutrient additions drive the nitrous oxide ratio in laboratory denitrification experiments: a systematic review" by Foltz, Alesso, and Zilles. 
 The database was finalized July 5, 2023, and R code was used to analyze data from that database version.
 
 Files and brief descriptions below:
